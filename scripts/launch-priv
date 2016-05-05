@@ -1,0 +1,9 @@
+#!/bin/sh
+
+docker run -dit --privileged \
+	-v /sys/fs/cgroup:/sys/fs/cgroup:ro \
+	-v /lib/modules:/lib/modules \
+	-v /lib64/modules:/lib64/modules \
+	-v /usr/lib/modules:/usr/lib/modules \
+	-v /usr/lib64/modules:/usr/lib64/modules \
+	-v /home/data:/home $@
