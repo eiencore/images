@@ -1,0 +1,52 @@
+#cloud-config
+hostname: "@@HOSTNAME@@"
+users:
+  - name: "user"
+    passwd: "$6$rounds=4096$i65zbFJ1L$uYwBHiJMS.MEUEalOgYCIWrD0EhGRD.oWndzEUlYOoPCdXQ2RyhUcio5WX07NIf5fsE2xb1sE0lzo6g/WZbpB1"
+    groups:
+      - "sudo"
+      - "docker"
+    ssh-authorized-keys:
+      - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCcK7mz2m0lZFuxzaSPPWIhLdg8gKe/yisS1znD1PslSkMI2TiEecf8rOv5BJuMN8r/zbIXw588EvhCFJ5hWExEKATPB7MtQ9p7qYZTBT4EkpOei4xqwdU+6ptD487DCaUero9MqKp6qKG7al4XOTwW5nlQPK3BS41AViw47jvKn0X6tzUomiw+HQR98+GbmeVbS+SDCGGhzmdrOgdWIrxBtBiCJ0/zJe7w5z+qT9YnRolIMQ4NazC9N/P8WWpChQ+ansmH2DGOys0HLdLPqOP+45PhP0nT1DKffqWFcEGnacAYTCprHga2yCcJlLfJq0kH4fRN88M+ZL844YAwbhpB iamtakingiteasy@eientei.org"
+write_files:
+  - path: "/etc/hosts"
+    permissions: "0644"
+    owner: "root"
+    content: |
+      172.17.0.1 @@HOSTNAME@@
+coreos:
+  etcd2:
+    discovery: "@@DISCOVERY@@"
+    advertise-client-urls: "http://@@HOSTNAME@@:2379"
+    initial-advertise-peer-urls: "http://@@HOSTNAME@@:2380"
+    listen-client-urls: "http://0.0.0.0:2379"
+    listen-peer-urls: "http://0.0.0.0:2380"
+  fleet:
+    public-ip: "$public_ipv4"
+    metadata: "region=ru-west"
+  update:
+    reboot-strategy: "best-effort"
+  units:
+    - name: etcd2.service
+      command: start
+      drop-ins:
+        - name: hostname.conf
+          content: |
+            [Service]
+            Environment=ETCD_NAME=%H
+    - name: fleet.service
+      command: start
+    - name: docker-container@.service
+      content: |
+        [Unit]
+        Description=Docker container: %i
+        Requires=docker.service
+        After=docker.service
+        
+        [Service]
+        ExecStart=/usr/bin/docker start %i
+        ExecStart=/bin/sh -c "etcdctl member update %i http://$(docker inspect --format '{{ .NetworkSettings.IPAddress }}' %i):2380"
+        ExecStop=/usr/bin/docker stop %i
+        
+        [Install]
+        WantedBy=multi-user.target

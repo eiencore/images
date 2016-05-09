@@ -11,7 +11,9 @@ RUN sed '/\[multilib\]/,+1{s/#//g};/Color/{s/#//g;}' -i /etc/pacman.conf && \
     pacman -Su --noconfirm | cat && \
     pacman-db-upgrade && \
     pacman -S  --noconfirm \
-               openssh wget sudo man git base-devel bc | cat && \
+               openssh wget sudo man git base-devel bc tinc | cat && \
+    mkdir -p /etc/tinc/cluster && \
+    tincd -n cluster -K | cat && \
     ( \
      find /lib/systemd/system/sysinit.target.wants/ \
           -type f \

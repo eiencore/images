@@ -8,12 +8,13 @@ fi
 firmware="$1"
 kernel="$2"
 
-tar -czvf build/oem.tar.gz -C data .
-mkdir build/work
-tar --strip 2 -C build/work -xvf "$firmware" ./lib/firmware
-tar --wildcards -C build/work --strip 3 -xvf "$kernel" \
+mkdir -p output/eiencore output/work
+tar -czvf output/eiencore/oem.tar.gz -C oemdata .
+tar --strip 2 -C output/work -xvf "$firmware" ./lib/firmware
+tar --wildcards -C output/work --strip 3 -xvf "$kernel" \
     './usr/lib/modules' './usr/boot/vmlinuz-*'
-mv build/work/vmlinuz-* build/work/vmlinuz-custom
-tar -czvf build/opt.tar.gz -C build/work .
-rm -r build/work
-
+mv output/work/vmlinuz-* output/work/vmlinuz-custom
+tar -czvf output/eiencore/opt.tar.gz -C output/work .
+rm -r output/work
+cp cloud-config.yml output/eiencore/
+cp install.sh output/eiencore/
