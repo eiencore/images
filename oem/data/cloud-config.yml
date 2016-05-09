@@ -1,0 +1,48 @@
+#cloud-config
+
+coreos:
+  units:
+    - name: lib-modules.mount
+      enable: true
+      command: start
+      content: |
+        [Unit]
+        Description=Mountpoint for modules
+        DefaultDependencies=no
+        
+        [Mount]
+        What=/opt/oem/modules
+        Where=/lib/modules
+        Type=none
+        Options=bind
+        
+        [Install]
+        RequiredBy=systemd-modules-load.service
+    - name: lib-firmware.mount
+      enable: true
+      command: start
+      content: |
+        [Unit]
+        Description=Mountpoint for firmware
+        DefaultDependencies=no
+        
+        [Mount]
+        What=/opt/oem/firmware
+        Where=/lib/firmware
+        Type=none
+        Options=bind
+        
+        [Install]
+        RequiredBy=systemd-modules-load.service
+    - name: docker.service
+      drop-ins:
+        - name: tasksmax.conf
+          content: |
+            [Service]
+            TasksMax=infinity
+    - name: systemd-modules-load.service
+      drop-ins:
+        - name: depends.conf
+          content: |
+            [Unit]
+            After=lib-modules.mount lib-firmware.mount
