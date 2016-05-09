@@ -1,0 +1,11 @@
+[Unit]
+Description=Tinc-generate/bootstrap host
+ConditionPathExists=!/etc/tinc/cluster/rsa_key.priv
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/tincd -n cluster -K
+ExecStart=/usr/bin/systemctl start tinc@cluster
+
+[Install]
+WantedBy=multi-user.target

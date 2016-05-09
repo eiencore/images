@@ -1,3 +1,40 @@
 #!/bin/sh
 
-docker run -dit --cap-add SYS_ADMIN -v /sys/fs/cgroup:/sys/fs/cgroup:ro $@
+args="$@"
+host=""
+chost="$(hostname)"
+net=0
+
+while [ $# -gt 0 ]; do
+	case "$1" in
+		--name)
+			shift
+			host="$1"
+		;;
+                --name=*)
+			host="${1##*=}"
+		;;
+		--net)
+			shift
+			net=1
+		;;
+                --net=*)
+			net=1
+		;;
+	esac
+	shift
+done 
+
+if [ "$host" != "" ] && [ $net -eq 0 ]; then
+	chost="$(hostname)-$host"
+	args="-h $chost $args"
+fi
+
+actual=$(
+docker run -dit --cap-add SYS_ADMIN  --cap-add NET_ADMIN --cap-add SYS_RESOURCE \
+       --device /dev/net/tun \
+       -v /sys/fs/cgroup:/sys/fs/cgroup:ro \
+       -v /home/cluster:/etc/tinc/cluster/hosts \
+       $args
+)
+docker exec $actual sed "s/vpn/$(hostname)/" -i /etc/tinc/cluster/tinc.conf

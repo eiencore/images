@@ -13,7 +13,7 @@ write_files:
     permissions: "0644"
     owner: "root"
     content: |
-      172.17.0.1 @@HOSTNAME@@
+      127.0.0.1 @@HOSTNAME@@
 coreos:
   etcd2:
     discovery: "@@DISCOVERY@@"
@@ -44,8 +44,10 @@ coreos:
         After=docker.service
         
         [Service]
+	RemainAfterExit=yes
+        Type=oneshot
         ExecStart=/usr/bin/docker start %i
-        ExecStart=/bin/sh -c "etcdctl member update %i http://$(docker inspect --format '{{ .NetworkSettings.IPAddress }}' %i):2380"
+        ExecStart=/bin/sh -c "etcdctl member update %i http://%H$([ "%H" != "%i" ] && echo "-%i").local:2380; true"
         ExecStop=/usr/bin/docker stop %i
         
         [Install]

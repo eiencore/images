@@ -1,6 +1,0 @@
-#!/bin/sh
-
-docker run -dit --privileged \
-	-v /sys/fs/cgroup:/sys/fs/cgroup:ro \
-	-v /lib/modules:/lib/modules \
-	-v /home/data:/home $@
