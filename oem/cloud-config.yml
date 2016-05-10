@@ -28,7 +28,6 @@ coreos:
     reboot-strategy: "best-effort"
   units:
     - name: etcd2.service
-      command: start
       drop-ins:
         - name: hostname.conf
           content: |

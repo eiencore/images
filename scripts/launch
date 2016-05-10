@@ -34,7 +34,42 @@ actual=$(
 docker run -dit --cap-add SYS_ADMIN  --cap-add NET_ADMIN --cap-add SYS_RESOURCE \
        --device /dev/net/tun \
        -v /sys/fs/cgroup:/sys/fs/cgroup:ro \
-       -v /home/cluster:/etc/tinc/cluster/hosts \
+       -v /home/data:/home \
        $args
 )
-docker exec $actual sed "s/vpn/$(hostname)/" -i /etc/tinc/cluster/tinc.conf
+
+if [ $net -eq 0 ]; then
+	nodes="$(docker exec "$(hostname)" etcdctl get /nodes),${chost}=http://${chost}.local:2380"
+	etcdconf="$(cat <<EOF
+ETCD_NAME="$chost"
+ETCD_INITIAL_CLUSTER_STATE="existing"
+ETCD_INITIAL_CLUSTER="$nodes"
+ETCD_ADVERTISE_CLIENT_URLS="http://${chost}.local:2379"
+ETCD_INITIAL_ADVERTISE_PEER_URLS="http://${chost}.local:2380"
+ETCD_LISTEN_CLIENT_URLS="http://0.0.0.0:2379"
+ETCD_LISTEN_PEER_URLS="http://0.0.0.0:2380"
+EOF
+	)"
+	docker exec "$(hostname)" etcdctl member add "$chost" "http://$chost.local:2380"
+else
+	nodes="${chost}=http://${chost}.local:2380"
+	etcdconf="$(cat <<EOF
+ETCD_NAME="$chost"
+ETCD_INITIAL_CLUSTER="$nodes"
+ETCD_ADVERTISE_CLIENT_URLS="http://${chost}.local:2379"
+ETCD_INITIAL_ADVERTISE_PEER_URLS="http://${chost}.local:2380"
+ETCD_LISTEN_CLIENT_URLS="http://0.0.0.0:2379"
+ETCD_LISTEN_PEER_URLS="http://0.0.0.0:2380"
+EOF
+	)"
+	
+fi
+
+
+docker exec $actual sh -c "echo '$etcdconf' > /etc/conf.d/etcd"
+docker exec $actual systemctl enable etcd
+docker exec $actual systemctl start etcd
+
+docker exec "$(hostname)" etcdctl --no-sync set /nodes "$nodes"
+
+cat /etc/conf.d/etcd | sed "/ETCD_INITIAL_CLUSTER=/{s/=.*/=\"$nodes\"/}"
