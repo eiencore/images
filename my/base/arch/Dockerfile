@@ -5,6 +5,7 @@ ENV container=docker \
     TERM=xterm-256color
 COPY nodroproot.conf /etc/systemd/system/avahi-daemon.service.d/
 COPY etcd.patch /tmp/
+COPY nodewatcher.service /etc/systemd/system/
 RUN sed '/\[multilib\]/,+1{s/#//g};/Color/{s/#//g;}' -i /etc/pacman.conf && \
     sed '/NAutoVTs/{s/^#//;s/=[0-9]*/=0/}' -i /etc/systemd/logind.conf && \
     pacman -Sy --noconfirm archlinux-keyring | cat && \
@@ -14,7 +15,8 @@ RUN sed '/\[multilib\]/,+1{s/#//g};/Color/{s/#//g;}' -i /etc/pacman.conf && \
     pacman-db-upgrade && \
     pacman -S  --noconfirm \
                openssh wget sudo man git base-devel bc avahi nss-mdns go | cat && \
-    sed '/hosts:/{s/dns/mdns_minimal [NOTFOUND=return] dns/}' -i '/etc/nsswitch.conf' && \
+    sed '/hosts:/{s/dns/mdns_minimal [NOTFOUND=return] dns/}' -i /etc/nsswitch.conf && \
+    sed '/.*\(allow-interfaces\).*/{s//\1=cluster/}' -i /etc/avahi/avahi-daemon.conf && \
     ( \
      find /lib/systemd/system/sysinit.target.wants/ \
           -type f \
@@ -28,7 +30,6 @@ RUN sed '/\[multilib\]/,+1{s/#//g};/Color/{s/#//g;}' -i /etc/pacman.conf && \
     ) | xargs rm -f && \
     systemctl set-default multi-user.target && \
     systemctl enable avahi-daemon && \
-    systemctl enable sshd && \
     systemctl disable getty@tty1 && \
     useradd -m user && \
     usermod -p "$(echo "ignore" | openssl passwd -1 -stdin)" user && \
@@ -41,5 +42,6 @@ RUN sed '/\[multilib\]/,+1{s/#//g};/Color/{s/#//g;}' -i /etc/pacman.conf && \
     sudo -u user yaourt -G --noconfirm etcd && \
     patch -d etcd -p1 < etcd.patch && \
     cd etcd && sudo -u user makepkg --noconfirm -si && cd .. && \
-    rm -r etcd package-query yaourt
+    rm -r etcd package-query yaourt && \
+    sudo -u user yaourt -S --noconfirm tinc-pre-git
 ENTRYPOINT ["/lib/systemd/systemd"]

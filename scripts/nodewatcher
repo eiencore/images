@@ -1,0 +1,35 @@
+#!/bin/sh
+
+update_nodes() {
+	nodes=$(echo $(etcdctl ls /cluster/nodes --recursive | \
+		grep '/init$' | \
+		grep -Po "(?<=/cluster/nodes/)[^/]*(?=/init)" | \
+		sed 's|.*|&=http://&.local:2380|') | \
+		tr ' ' ',')
+	sed "s|\(ETCD_INITIAL_CLUSTER\)=.*|\1=\"$nodes\"|" -i /etc/conf.d/etcd
+	rm -f "/tmp/ack_${ETCD_WATCH_VALUE}"
+}
+
+tinchost=$(echo $ETCD_WATCH_VALUE | sed 's/-/_/g')
+
+case $ETCD_WATCH_KEY in
+	*/init)
+		case $ETCD_WATCH_ACTION in
+			create|set)
+				etcdctl member add $ETCD_WATCH_VALUE http://${ETCD_WATCH_VALUE}.local:2380
+				update_nodes 
+				echo "ConnectTo = $tinchost" >> /etc/tinc/cluster/tinc.conf
+			;;
+			delete)
+				$(etcdctl member remove $ETCD_WATCH_VALUE 2>&1 | grep etcdctl)
+				update_nodes
+				sed "/ConnectTo = $tinchost/d" -i /etc/tinc/cluster/tinc.conf
+			;;
+		esac
+	;;
+	*/address)
+		tincnode=$(echo $ETCD_WATCH_KEY | sed 's|/address||;s|.*/||;s/-/_/g')
+		sed '/Address/d' -i /etc/tinc/cluster/hosts/$tincnode
+		echo "Address = $ETCD_WATCH_VALUE" >> /etc/tinc/cluster/hosts/$tincnode
+	;;
+esac

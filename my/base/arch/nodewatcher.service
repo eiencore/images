@@ -1,0 +1,10 @@
+[Unit]
+Description=Cluster node manager
+After=etcd.service
+
+[Service]
+Restart=always
+ExecStart=/usr/bin/etcdctl exec-watch --recursive /cluster/nodes -- /opt/cluster/nodewatcher
+
+[Install]
+WantedBy=multi-user.target
