@@ -1,0 +1,12 @@
+#!/bin/sh
+nexusip=$(docker -H unix:///docker.sock inspect -f '{{.NetworkSettings.IPAddress}}' $(hostname))
+echo "$nexusip nexus" >> /etc/hosts
+tinchost=$(hostname | sed 's/-/_/g')
+tinc -n cluster init $tinchost
+cat >> /etc/tinc/cluster/tinc.conf <<EOF
+Mode = switch
+Address = nexus
+EOF
+echo 'avahi-autoipd -wD $INTERFACE' > /etc/tinc/cluster/tinc-up
+systemctl enable tinc@cluster
+systemctl start tinc@cluster

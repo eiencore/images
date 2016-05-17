@@ -1,0 +1,8 @@
+#!/bin/sh
+[ -f /etc/tinc/cluster/tinc.conf ] || exit 1
+while [ ! -f /etc/tinc/cluster/tinc-up ] || [ $(wc -l /etc/tinc/cluster/tinc-up) -lt 1 ]; do
+	sleep 1
+done
+echo 'avahi-autoipd -wD $INTERFACE' > /etc/tinc/cluster/tinc-up
+systemctl enable tinc@cluster
+systemctl start tinc@cluster

@@ -1,0 +1,38 @@
+diff -ruN a/cgo.patch b/cgo.patch
+--- a/cgo.patch	1970-01-01 00:00:00.000000000 +0000
++++ b/cgo.patch	2016-05-10 06:36:36.750170569 +0000
+@@ -0,0 +1,11 @@
++diff -ru a/build b/build
++--- a/build	2016-04-01 21:32:28.000000000 +0000
+++++ b/build	2016-05-10 06:33:43.999874111 +0000
++@@ -29,5 +29,5 @@
++ fi
++ 
++ # Static compilation is useful when etcd is run in a container
++-CGO_ENABLED=0 go build $GO_BUILD_FLAGS -installsuffix cgo -ldflags "-s -X ${REPO_PATH}/version.GitSHA${LINK_OPERATOR}${GIT_SHA}" -o bin/etcd ${REPO_PATH}
++-CGO_ENABLED=0 go build $GO_BUILD_FLAGS -installsuffix cgo -ldflags "-s" -o bin/etcdctl ${REPO_PATH}/etcdctl
+++CGO_ENABLED=1 go build $GO_BUILD_FLAGS -tags netcgo -installsuffix cgo -ldflags "-s -X ${REPO_PATH}/version.GitSHA${LINK_OPERATOR}${GIT_SHA}" -o bin/etcd ${REPO_PATH}
+++CGO_ENABLED=1 go build $GO_BUILD_FLAGS -tags netcgo -installsuffix cgo -ldflags "-s" -o bin/etcdctl ${REPO_PATH}/etcdctl
+diff -ruN a/PKGBUILD b/PKGBUILD
+--- a/PKGBUILD	2016-04-13 06:43:17.000000000 +0000
++++ b/PKGBUILD	2016-05-10 06:38:37.318064896 +0000
+@@ -14,10 +14,17 @@
+ install="${pkgname}.install"
+ source=("${pkgname}-${pkgver}.tar.gz::https://github.com/coreos/${pkgname}/archive/v${pkgver}.tar.gz"
+         "${pkgname}.service"
+-        "${pkgname}.conf")
++        "${pkgname}.conf"
++        "cgo.patch")
+ md5sums=('451c988edd824367b6063e2c4f734d3c'
+          '1ccf13f8b80f10e21e92361a4dea1a44'
+-         'bd315606b36e519c578db34722b57622')
++         'bd315606b36e519c578db34722b57622'
++         '6558567c9a71062c7c337b0fb98fdf0a')
++
++prepare() {
++  cd ${srcdir}/${pkgname}-${pkgver}
++	patch -Np1 < ../../cgo.patch
++}
+ 
+ build() {
+   cd ${srcdir}/${pkgname}-${pkgver}

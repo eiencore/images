@@ -1,0 +1,12 @@
+#!/bin/sh
+cat > /etc/conf.d/etcd <<EOF
+ETCD_NAME="$(hostname)"
+ETCD_INITIAL_CLUSTER_STATE="new"
+ETCD_INITIAL_CLUSTER="$(hostname)=http://$(hostname).local:2380"
+ETCD_INITIAL_ADVERTISE_PEER_URLS="http://$(hostname).local:2380"
+ETCD_ADVERTISE_CLIENT_URLS="http://$(hostname).local:2379"
+ETCD_LISTEN_CLIENT_URLS="http://0.0.0.0:2379"
+ETCD_LISTEN_PEER_URLS="http://0.0.0.0:23780"
+EOF
+systemctl enable etcd.service
+systemctl start etcd.service

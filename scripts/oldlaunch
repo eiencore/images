@@ -1,0 +1,105 @@
+#!/bin/sh
+
+name=$1
+image=${2:-my/base/arch}
+nodes=$(docker ps -q | wc -l)
+
+if [ -z $name ]; then
+	echo "please specify --name"
+	exit
+fi
+
+args="--name=$name"
+
+if [ $nodes -eq 0 ]; then
+	host="$(hostname)"
+	args="--net=host $args"
+else
+	host="$(hostname)-$name"
+	args="-h $host $args"
+fi
+
+docker run -dit --cap-add SYS_ADMIN  --cap-add NET_ADMIN --cap-add SYS_RESOURCE \
+       --device /dev/net/tun \
+       -v /sys/fs/cgroup:/sys/fs/cgroup:ro \
+       -v /home/data:/home \
+       -v /home/cluster:/opt/cluster \
+       $args $image
+
+desc="${host}=http://${host}.local:2380"
+if [ $nodes -gt 0 ]; then
+	desc=$desc,$(docker exec $(hostname) sh -c 'echo $(etcdctl ls /cluster/nodes | sed "s|.*/||g;s|.*|&=http://&.local:2380|g")' | tr ' ' ',')
+	mode=existing
+else
+	mode=new
+fi
+
+
+config="$(cat <<EOF
+ETCD_NAME="$host"
+ETCD_INITIAL_CLUSTER_STATE="$mode"
+ETCD_INITIAL_CLUSTER="$desc"
+ETCD_ADVERTISE_CLIENT_URLS="http://${host}.local:2379"
+ETCD_INITIAL_ADVERTISE_PEER_URLS="http://${host}.local:2380"
+ETCD_LISTEN_CLIENT_URLS="http://0.0.0.0:2379"
+ETCD_LISTEN_PEER_URLS="http://0.0.0.0:2380"
+EOF
+)"
+
+docker exec "$name" sh -c "echo '$config' > /etc/conf.d/etcd"
+
+tinchost=$(echo $host | sed 's/-/_/g')
+if [ $nodes -eq 0 ]; then
+	docker exec $name tinc -n cluster init $tinchost
+	docker exec $name sh -c "echo Mode = switch >> /etc/tinc/cluster/tinc.conf"
+	docker exec $name sh -c "echo Address = 172.17.0.1 >> /etc/tinc/cluster/hosts/$tinchost"
+else
+	invite=$(docker exec $(hostname) tinc -n cluster invite $tinchost | sed 's|^[^/]*/|172.17.0.1/|')
+	docker exec $name tinc join $invite
+	docker exec $name sed '/ConnectTo/d' -i /etc/tinc/cluster/tinc.conf
+fi
+
+docker exec $name sh -c "echo 'avahi-autoipd -wD \$INTERFACE' > /etc/tinc/cluster/tinc-up"
+
+docker exec $name systemctl enable tinc@cluster
+docker exec $name systemctl start tinc@cluster
+
+if [ $nodes -eq 0 ]; then
+	docker exec $name systemctl enable etcd
+	docker exec $name systemctl start etcd
+	docker exec $name etcdctl --no-sync mkdir /cluster
+	docker exec $name etcdctl --no-sync mkdir /cluster/nodes
+	docker exec $name etcdctl --no-sync mkdir /cluster/nodes/$host
+else 
+	docker exec $(hostname) etcdctl mkdir /cluster/nodes/$host
+fi
+
+conns="$(docker exec $(hostname) etcdctl ls /cluster/nodes | grep -v "/${host}\$" | sed 's|.*/||g;s|.*|ConnectTo = &|g')"
+if [ ! -z "$conns" ]; then
+	docker exec "$name" sh -c "echo '$conns' >> /etc/tinc/cluster/tinc.conf"
+fi
+
+while true; do
+	docker exec $name ip addr show cluster | grep -q "inet " && break
+	sleep 1
+done
+if [ $nodes -gt 0 ]; then
+	( \
+		docker exec $(hostname) touch /tmp/ack_$host; \
+		docker exec $(hostname) tail --follow=name /tmp/ack_$host 2>/dev/null; \
+		docker exec $name systemctl enable etcd.service; \
+		docker exec $name systemctl start etcd.service; \
+	) &
+	docker exec $(hostname) etcdctl mk /cluster/nodes/$host/init $host
+	docker exec "$name" systemctl enable sshd
+	docker exec "$name" systemctl start sshd
+	wait
+fi
+
+docker exec $name sh -c "echo 'etcdctl set /cluster/nodes/\$(hostname)/address \$(ip addr show \$INTERFACE | awk \"/inet /{print \\\$2; exit}\" | sed \"s|/.*||g\")' >> /etc/tinc/cluster/tinc-up"
+docker exec $name systemctl enable nodewatcher.service
+docker exec $name systemctl start nodewatcher.service
+docker exec $(hostname) sh -c "etcdctl set /cluster/nodes/$host/address \$(ip addr show \$INTERFACE | awk \"/inet /{print \$2; exit}\" | sed \"s|/.*||g\")"
+#docker exec $(hostname) sh -c 'etcdctl set /cluster/nodes/$host/address \$\(ip addr show cluster \| awk "/inet /{print \$2; exit}" \| sed "s|/.*||g" \)'
+
+echo $host ready

@@ -1,0 +1,11 @@
+[Unit]
+Description=Cluster init services
+Before=multi-user.target
+ConditionPathExists=/opt/cluster/layers
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh /opt/cluster/bin/clusterinit init
+
+[Install]
+WantedBy=basic.target

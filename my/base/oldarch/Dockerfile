@@ -13,7 +13,11 @@ RUN : Initalization of pacman/systemd environemnt && \
     pacman-key --populate archlinux && \
     pacman -Su --noconfirm | cat && \
     pacman-db-upgrade && \
-    pacman -S --noconfirm sudo git base-devel bc openssh wget unzip man && \
+    : Installing required packages && \
+    pacman -S  --noconfirm openssh wget sudo unzip man git base-devel bc avahi nss-mdns | cat && \
+    : Tuning new packages && \
+    sed '/hosts:/{s/dns/mdns_minimal [NOTFOUND=return] dns/}' -i /etc/nsswitch.conf && \
+    sed '/.*\(allow-interfaces\).*/{s//\1=cluster/}' -i /etc/avahi/avahi-daemon.conf && \
     : Purging excessive systemd units && \
     ( \
      find /lib/systemd/system/sysinit.target.wants/ \
@@ -28,16 +32,17 @@ RUN : Initalization of pacman/systemd environemnt && \
     ) | xargs rm -f && \
     : Tuning for our environment && \
     systemctl set-default multi-user.target && \
+    systemctl enable avahi-daemon && \
     systemctl disable getty@tty1 && \
     : Create user account && \
     useradd -m user && \
     usermod -p "$(echo "ignore" | openssl passwd -1 -stdin)" user && \
     echo "user ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
-    : Yaourt && \
     cd /tmp && \
     sudo -u user git clone https://aur.archlinux.org/package-query.git && \
     cd package-query && sudo -u user makepkg --noconfirm -si && cd .. && \
     sudo -u user git clone https://aur.archlinux.org/yaourt.git && \
     cd yaourt && sudo -u user makepkg --noconfirm -si && cd .. && \
-    rm -r package-query yaourt
+    rm -r package-query yaourt && \
+    sudo -u user yaourt -S --noconfirm tinc-pre-git
 ENTRYPOINT ["/lib/systemd/systemd"]
