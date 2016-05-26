@@ -1,0 +1,9 @@
+#!/bin/sh
+cat > /etc/conf.d/skydns <<EOF
+SKYDNS_ADDR=0.0.0.0:53
+SKYDNS_DOMAIN="$(cat /etc/resolv.conf | grep -Po '(?<=search ).*')"
+SKYDNS_LOCAL="$(hostname)"
+SKYDNS_NAMESERVERS="8.8.8.8:53,8.8.4.4:53"
+EOF
+systemctl enable skydns.service
+systemctl start skydns.service

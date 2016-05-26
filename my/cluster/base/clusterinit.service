@@ -4,8 +4,9 @@ Before=multi-user.target
 ConditionPathExists=/opt/cluster/layers
 
 [Service]
-Type=oneshot
 ExecStart=/bin/sh /opt/cluster/bin/clusterinit init
+Restart=on-failure
+RestartSec=10s
 
 [Install]
 WantedBy=basic.target

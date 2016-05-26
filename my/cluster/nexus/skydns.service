@@ -1,0 +1,17 @@
+[Unit]
+Description=SkyDNS service
+After=etcd.service
+Wants=etcd.service
+
+[Service]
+Restart=always
+RestartSec=10s
+Environment="SKYDNS_NAMESERVERS=8.8.8.8:53,8.8.4.4:53"
+Environment="SKYDNS_ADDR=0.0.0.0:53"
+Environment="SKYDNS_LOCAL=$HOSTNAME"
+Environment="SKYDNS_DOMAIN=skydns.local."
+EnvironmentFile=/etc/conf.d/skydns
+ExecStart=/usr/bin/skydns -addr $SKYDNS_ADDR -nameservers $SKYDNS_NAMESERVERS
+
+[Install]
+WantedBy=multi-user.target

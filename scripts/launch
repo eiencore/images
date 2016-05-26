@@ -5,6 +5,9 @@ if [ -z "$name" ]; then
 	echo "empty name"
 	exit 1
 fi
+shift
+
+args="$@"
 
 nexusip=$(docker inspect -f '{{.NetworkSettings.IPAddress}}' $(hostname) 2>/dev/null)
 
@@ -24,6 +27,9 @@ if [ "$name" = "nexus" ]; then
 		-v /sys/fs/cgroup:/sys/fs/cgroup:ro \
 		--name $(hostname) \
 		-h $(hostname) \
+		--dns 127.0.0.1 \
+		--dns-search eiencore \
+		$args \
 		my/cluster/nexus
 	echo "Waiting for nexus"
 	while ! docker exec $(hostname) pgrep tincd >/dev/null; do
@@ -38,7 +44,7 @@ else
 		exit 1
 	fi
 	fullname=$(hostname)-$name;
-	if docker inspect -f 'yes' $fullname; then
+	if docker inspect -f 'yes' $fullname &> /dev/null; then
 		echo "Container already exists: $fullname"
 		exit 1
 	fi
@@ -53,14 +59,26 @@ else
 		--name $fullname \
 		-h $fullname \
 		--add-host nexus:$nexusip \
+		--dns $nexusip \
+		--dns-search eiencore \
+		$args \
 		my/cluster/node
 
 	echo "Waiting for node"
 	tinchost=$(echo $fullname | sed 's/-/_/g')
+	docker exec $(hostname) tinc -n cluster disconnect $tinchost &> /dev/null
+	docker exec $(hostname) rm -f /etc/tinc/cluster/hosts/$tinchost
+	docker exec $(hostname) tinc -n cluster purge 
 	tincinvite=$(docker exec $(hostname) tinc -n cluster invite $tinchost)
-	echo $tincinvite
+	if [ -z "$tincinvite" ]; then
+		echo "Unable to receive invite"
+		docker rm -f $fullname
+		exit 1
+	fi
+	echo "Got invite: $tincinvite"
 	docker exec $fullname tinc -n cluster join $tincinvite
-	while ! docker exec $fullname sh -c "test /etc/tinc/cluster/tinc.conf"; do
+	while ! docker exec $fullname test -f /etc/tinc/cluster/tinc.conf; do
+		echo -n "."
 		sleep 1
 	done
 	echo ""

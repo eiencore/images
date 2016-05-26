@@ -7,23 +7,14 @@ url="https://github.com/crosbymichael/skydock"
 license=("MIT")
 makedepends=("go")
 source=(
-	"git+https://github.com/crosbymichael/skydock"
-	"skydock-log.patch"
+	"git+https://github.com/eiencore/skydock"
 )
 md5sums=(
 	"SKIP"
-	"e392cceb5313a735b8052e57ce5694ee"
 )
 
-prepare() {
-	export GOPATH="$startdir"
-	go get -v -d github.com/crosbymichael/skydock || true
-	patch -d "$srcdir/$pkgname" -p1 < skydock-log.patch
-	patch -d "$srcdir/github.com/crosbymichael/skydock" -p1 < skydock-log.patch
-}
-
 build() {
-	export GOPATH="$startdir"
+	export GOPATH="$srcdir"
 	cd "$srcdir/$pkgname"
 	go get -v -d
 	go build -v

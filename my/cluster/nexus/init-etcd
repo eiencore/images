@@ -10,3 +10,4 @@ ETCD_LISTEN_PEER_URLS="http://0.0.0.0:23780"
 EOF
 systemctl enable etcd.service
 systemctl start etcd.service
+etcdctl set "/skydns/eiencore/_tcp/_etcd-client/$(hostname)" '{"host": "'$(hostname)'.local", "port": 2379}' || exit 1
